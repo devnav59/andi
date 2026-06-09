@@ -3,9 +3,14 @@ name: Android CI Build
 on:
   push:
     branches: [ "*" ] # Triggers build on push to any branch
+    tags:
+      - "v*" # Triggers build on tags matching v* (e.g., v1.0.0, v1.1.0)
   pull_request:
     branches: [ "*" ] # Triggers build on any pull request
   workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -67,3 +72,18 @@ jobs:
           name: app-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 7
+
+      - name: Create GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || format('Release v1.0.{0}', github.run_number) }}
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
