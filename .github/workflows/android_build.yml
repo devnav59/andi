@@ -21,7 +21,14 @@ jobs:
         with:
           java-version: '17' # Matches JVM toolchain version for modern Android
           distribution: 'temurin'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fix Gradle Wrapper JAR
+        run: |
+          echo "Restoring official standard gradle-wrapper.jar to resolve potential transport corruption..."
+          curl -Lo gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v9.3.1/gradle/wrapper/gradle-wrapper.jar
 
       - name: Decode Debug Keystore
         run: |
