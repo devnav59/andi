@@ -7,8 +7,6 @@ on:
     branches: [ "*" ] # Triggers build on any pull request
   workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
 
-jwt: {} # Standard settings
-
 jobs:
   build:
     name: Build Android APKs
