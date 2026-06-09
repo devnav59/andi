@@ -1,0 +1,62 @@
+name: Android CI Build
+
+on:
+  push:
+    branches: [ "*" ] # Triggers build on push to any branch
+  pull_request:
+    branches: [ "*" ] # Triggers build on any pull request
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+jwt: {} # Standard settings
+
+jobs:
+  build:
+    name: Build Android APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17' # Matches JVM toolchain version for modern Android
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Decode Debug Keystore
+        run: |
+          if [ -f "debug.keystore.base64" ]; then
+            echo "Reconstructed debug.keystore from repository base64 key."
+            base64 -d debug.keystore.base64 > debug.keystore
+          else
+            echo "Warning: No debug.keystore.base64 found. Clean build will run using standard key configuration."
+          fi
+
+      - name: Initialize Environment Secrets
+        run: |
+          if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+            echo "Initializing .env file from .env.example..."
+            cp .env.example .env
+          fi
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug & Release APKs
+        run: ./gradlew assembleDebug assembleRelease
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
