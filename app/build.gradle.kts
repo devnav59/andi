@@ -1,3 +1,6 @@
+import java.io.File
+import java.util.Base64
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -31,6 +34,27 @@ android {
       keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
+    create("releaseConfig") {
+      val rKeyStorePath = System.getenv("RELEASE_KEYSTORE_FILE") ?: (project.findProperty("RELEASE_KEYSTORE_FILE") as? String) ?: "${rootDir}/release.keystore"
+      val rKeyStorePass = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: (project.findProperty("RELEASE_KEYSTORE_PASSWORD") as? String) ?: "androidrelease"
+      val rKeyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: (project.findProperty("RELEASE_KEY_ALIAS") as? String) ?: "my-release-key"
+      val rKeyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: (project.findProperty("RELEASE_KEY_PASSWORD") as? String) ?: "androidrelease"
+
+      val isFilePresent = file(rKeyStorePath).exists()
+      if (isFilePresent) {
+        storeFile = file(rKeyStorePath)
+        storePassword = rKeyStorePass
+        keyAlias = rKeyAlias
+        keyPassword = rKeyPass
+      } else {
+        // Fallback to debug configuration if release keystore was not generated yet.
+        // This ensures the gradle build never fails compilation due to a missing keystore.
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
   }
 
   buildTypes {
@@ -38,7 +62,7 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debugConfig")
+      signingConfig = signingConfigs.getByName("releaseConfig")
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
@@ -220,4 +244,45 @@ afterEvaluate {
         finalizedBy("copyReleaseToOutputs")
     }
 }
+
+tasks.register("generateReleaseKeystore") {
+    val rootPath = project.rootDir.absolutePath
+    val destFilePath = "$rootPath/release.keystore"
+    val base64FilePath = "$rootPath/release.keystore.base64"
+    doLast {
+        val destFile = File(destFilePath)
+        val base64File = File(base64FilePath)
+        if (!destFile.exists()) {
+            val pb = ProcessBuilder(
+                "keytool", "-genkeypair", "-v",
+                "-keystore", destFile.absolutePath,
+                "-alias", "my-release-key",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "10000",
+                "-storepass", "androidrelease",
+                "-keypass", "androidrelease",
+                "-dname", "CN=Android, O=AIStudio, C=US"
+            )
+            pb.inheritIO()
+            val process = pb.start()
+            val exitCode = process.waitFor()
+            if (exitCode == 0) {
+                println("Successfully generated release.keystore at ${destFile.absolutePath}")
+            } else {
+                throw GradleException("Failed to generate release.keystore with exit code $exitCode")
+            }
+        } else {
+            println("release.keystore already exists; skipping generation.")
+        }
+
+        if (destFile.exists() && (!base64File.exists() || base64File.length() == 0L)) {
+            val bytes = destFile.readBytes()
+            val base64String = Base64.getEncoder().encodeToString(bytes)
+            base64File.writeText(base64String)
+            println("Successfully encoded release.keystore to Base64 at ${base64File.absolutePath}")
+        }
+    }
+}
+
 

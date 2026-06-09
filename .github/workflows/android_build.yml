@@ -37,13 +37,19 @@ jobs:
           echo "Restoring official standard gradle-wrapper.jar to resolve potential transport corruption..."
           curl -Lo gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v9.3.1/gradle/wrapper/gradle-wrapper.jar
 
-      - name: Decode Debug Keystore
+      - name: Decode Debug & Release Keystores
         run: |
           if [ -f "debug.keystore.base64" ]; then
             echo "Reconstructed debug.keystore from repository base64 key."
             base64 -d debug.keystore.base64 > debug.keystore
           else
-            echo "Warning: No debug.keystore.base64 found. Clean build will run using standard key configuration."
+            echo "Warning: No debug.keystore.base64 found."
+          fi
+          if [ -f "release.keystore.base64" ]; then
+            echo "Reconstructed release.keystore from repository base64 key."
+            base64 -d release.keystore.base64 > release.keystore
+          else
+            echo "Warning: No release.keystore.base64 found. Will fallback to debug signing."
           fi
 
       - name: Initialize Environment Secrets
